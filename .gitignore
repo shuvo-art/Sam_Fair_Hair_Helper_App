@@ -1,0 +1,72 @@
+# Node.js modules
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Build files
+dist/
+build/
+
+# MongoDB database lock files
+*.lock
+
+# Stripe CLI files
+stripe/
+
+# Temporary files
+temp/
+*.tmp
+*.temp
+
+# Debug files
+*.stackdump
+*.pid
+
+# Cache
+.cache/
+coverage/
+
+# TypeScript output files
+*.tsbuildinfo
+
+# Nodemailer-specific temporary files
+.nodemailer-debug-log*
+
+# Generated Socket.IO files
+socket.io/
+
+# Cloudinary
+cloudinary/
+
+# Axios-specific cache files (if enabled)
+axios-cache/
+
+# Ignore test results or temporary test artifacts
+tests-output/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Firebase Admin SDK key 
+src/app/config/somos-ai-voice-cloning-firebase-adminsdk-fbsvc-0793bb60e0.json
