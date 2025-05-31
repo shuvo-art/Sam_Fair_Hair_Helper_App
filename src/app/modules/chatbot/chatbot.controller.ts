@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { ChatHistory } from './chatHistory.model';
 import { Budget } from '../budget/budget.model';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
@@ -21,45 +21,34 @@ interface ResponseData {
   response: string;
 }
 
-async function processUserInput({
-  text_input,
-  pdf_path,
-  image_path,
-  budget_info,
-  conversation_history,
-}: UserInputData): Promise<ResponseData> {
-  const pythonDir = path.join(__dirname, '../../../../samfair');
-  let pythonScriptPath: string;
-  let command: string;
-
-  if (pdf_path && !text_input && !image_path && !budget_info && !conversation_history) {
-    // Admin PDF upload with Upload.py
-    pythonScriptPath = path.join(pythonDir, 'Upload.py');
-    command = `python -u "${pythonScriptPath}" "${pdf_path}"`;
-  } else {
-    // User inputs with Chat.py
-    pythonScriptPath = path.join(pythonDir, 'Chat.py');
-    command = `python -u "${pythonScriptPath}"`;
-
-    if (text_input) command += ` "${text_input.replace(/"/g, '\\"')}"`;
-    if (image_path) command += ` --image "${image_path}"`;
-    if (pdf_path) command += ` --pdf "${pdf_path}"`;
-    if (budget_info) {
-      const escapedBudgetInfo = budget_info.replace(/"/g, '\\"');
-      command += ` --budget """${escapedBudgetInfo}"""`;
-    }
-    if (conversation_history) {
-      const escapedHistory = conversation_history.replace(/"/g, '\\"');
-      command += ` --history """${escapedHistory}"""`;
+// Check if Python is available and get the executable
+function getPythonExecutable(): string {
+  const possibleExecutables = ['python', 'python3', 'py'];
+  for (const exec of possibleExecutables) {
+    try {
+      execSync(`${exec} --version`, { stdio: 'ignore' });
+      return exec;
+    } catch (error) {
+      continue;
     }
   }
+  throw new Error('Python executable not found. Please ensure Python is installed and in the PATH.');
+}
 
-  console.log('Executing Python command:', command);
+async function processAdminPdfUpload(pdf_path: string): Promise<ResponseData> {
+  const pythonDir = path.join(__dirname, '../../../../samfair');
+  const pythonScriptPath = path.join(pythonDir, 'Upload.py');
+  const pythonExec = getPythonExecutable();
+  const command = `${pythonExec} -u "${pythonScriptPath}" "${pdf_path}"`;
+
+  console.log('Executing Python command for admin PDF upload:', command);
+  console.log('Python directory:', pythonDir);
+  console.log('Environment PATH:', process.env.PATH);
 
   try {
     const { stdout, stderr } = await execPromise(command, {
-      shell: 'cmd.exe',
       cwd: pythonDir,
+      // Remove shell: 'cmd.exe' to use default shell
     });
     console.log('Python script stdout:', stdout);
     console.log('Python script stderr:', stderr);
@@ -68,10 +57,57 @@ async function processUserInput({
     const response = responseMatch ? responseMatch[1].trim() : 'No response generated';
     return { response };
   } catch (error: any) {
-    console.error('Error executing Python script:', error.message);
+    console.error('Error executing Python script for admin PDF:', error.message);
     console.error('Command output:', error.stdout || 'No stdout');
     console.error('Command error output:', error.stderr || 'No stderr');
-    throw new Error(`Command failed: ${error.message}\n${error.stderr || ''}`);
+    throw new Error(`Command failed: ${error.message}${error.stderr ? `\n${error.stderr}` : ''}`);
+  }
+}
+
+async function processUserChatInput({
+  text_input,
+  pdf_path,
+  image_path,
+  budget_info,
+  conversation_history,
+}: UserInputData): Promise<ResponseData> {
+  const pythonDir = path.join(__dirname, '../../../../samfair');
+  const pythonScriptPath = path.join(pythonDir, 'Chat.py');
+  const pythonExec = getPythonExecutable();
+  let command = `${pythonExec} -u "${pythonScriptPath}"`;
+
+  if (text_input) command += ` "${text_input.replace(/"/g, '\\"')}"`;
+  if (image_path) command += ` --image "${image_path}"`;
+  if (pdf_path) command += ` --pdf "${pdf_path}"`;
+  if (budget_info) {
+    const escapedBudgetInfo = budget_info.replace(/"/g, '\\"');
+    command += ` --budget """${escapedBudgetInfo}"""`;
+  }
+  if (conversation_history) {
+    const escapedHistory = conversation_history.replace(/"/g, '\\"');
+    command += ` --history """${escapedHistory}"""`;
+  }
+
+  console.log('Executing Python command for user chat input:', command);
+  console.log('Python directory:', pythonDir);
+  console.log('Environment PATH:', process.env.PATH);
+
+  try {
+    const { stdout, stderr } = await execPromise(command, {
+      cwd: pythonDir,
+      // Remove shell: 'cmd.exe' to use default shell
+    });
+    console.log('Python script stdout:', stdout);
+    console.log('Python script stderr:', stderr);
+
+    const responseMatch = stdout.match(/AI Response: ([\s\S]+)/);
+    const response = responseMatch ? responseMatch[1].trim() : 'No response generated';
+    return { response };
+  } catch (error: any) {
+    console.error('Error executing Python script for user chat:', error.message);
+    console.error('Command output:', error.stdout || 'No stdout');
+    console.error('Command error output:', error.stderr || 'No stderr');
+    throw new Error(`Command failed: ${error.message}${error.stderr ? `\n${error.stderr}` : ''}`);
   }
 }
 
@@ -97,8 +133,7 @@ export const handlePdfUpload: RequestHandler = async (req, res) => {
     const pdfPath = path.resolve(file.path);
     console.log('PDF file path:', pdfPath);
 
-    const inputData: UserInputData = { pdf_path: pdfPath };
-    const response = await processUserInput(inputData);
+    const response = await processAdminPdfUpload(pdfPath);
 
     if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
     console.log('Temporary PDF file cleaned up');
@@ -193,7 +228,7 @@ export const handleChatMessage: RequestHandler = async (req, res) => {
       budget_info: budgetInfoString,
       conversation_history: conversationHistoryString || undefined,
     };
-    const botResponse = await processUserInput(inputData);
+    const botResponse = await processUserChatInput(inputData);
     console.log('Bot response received:', botResponse.response);
 
     const botMessageId = userMessageId + 1;

@@ -2,7 +2,7 @@ import os
 import json
 import numpy as np
 from scipy.spatial.distance import cosine
-import openai
+from openai import OpenAI  # Updated import
 from pinecone import Pinecone
 from typing import List, Dict, Any
 from collections import deque
@@ -125,9 +125,15 @@ class NDISAssistant:
         
         logger.info("NDIS Assistant initialized with Pinecone knowledge base")
 
-    def _load_budget(self, budget_info: List[Dict]) -> None:
+    def _load_budget(self, budget_info: Any) -> None:
         """Load and parse user's NDIS budget information."""
         try:
+            # Ensure budget_info is a list
+            if isinstance(budget_info, str):
+                budget_info = json.loads(budget_info) if budget_info else []
+            if not isinstance(budget_info, list):
+                raise ValueError("budget_info must be a list or valid JSON string")
+
             if not budget_info:
                 self.budget_data = []
                 self.budget_info = "No budget information provided."
@@ -136,6 +142,9 @@ class NDISAssistant:
             self.budget_data = budget_info
             budget_text = "User's NDIS Budget Information:\n"
             for entry in budget_info:
+                if not isinstance(entry, dict):
+                    logger.warning(f"Invalid budget entry: {entry}")
+                    continue
                 budget_text += f"- Category: {entry.get('category', 'Unknown')}\n"
                 budget_text += f"  Subcategory: {entry.get('subcategory', 'Unknown')}\n"
                 budget_text += f"  Amount: ${entry.get('amount', 0):.2f}\n"
@@ -156,17 +165,17 @@ class NDISAssistant:
             logger.error("Missing OPENAI_API_KEY environment variable")
             raise EnvironmentError("Missing OPENAI_API_KEY environment variable")
         
-        openai.api_key = self.api_key
+        self.openai_client = OpenAI(api_key=self.api_key)  # Initialize OpenAI client
 
     def _get_embedding(self, text: str, retry_attempts: int = 3) -> np.ndarray:
         """Generate embedding for query using OpenAI."""
         for attempt in range(retry_attempts):
             try:
-                result = openai.Embedding.create(
+                result = self.openai_client.embeddings.create(
                     model=self.embedding_model,
                     input=text
                 )
-                return np.array(result['data'][0]['embedding'])
+                return np.array(result.data[0].embedding)
             except Exception as e:
                 logger.warning(f"Embedding generation attempt {attempt+1} failed: {str(e)}")
                 if attempt < retry_attempts - 1:
@@ -416,14 +425,14 @@ class NDISAssistant:
                 {user_message}
                 """}
             ]
-            response = openai.ChatCompletion.create(
+            response = self.openai_client.chat.completions.create(
                 model=self.chat_model,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=1200,
                 top_p=1.0
             )
-            return response['choices'][0]['message']['content'].strip()
+            return response.choices[0].message.content.strip()
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
             return "I apologize, but I'm experiencing a technical issue. Could you please try again in a moment?"

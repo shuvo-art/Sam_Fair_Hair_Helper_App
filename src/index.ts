@@ -14,9 +14,20 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 5001;
 
-// Enable CORS for all routes
+// Configure CORS with multiple allowed origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['*']; // Default to '*' if ALLOWED_ORIGINS is not set
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS || '*', // Allow specific origins or all origins ('*')
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., curl or Postman) and check against allowed origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow these HTTP methods
   allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
   credentials: true, // Allow cookies and auth headers if needed
