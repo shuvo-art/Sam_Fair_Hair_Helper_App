@@ -34,12 +34,12 @@ app.use(cors({
 }));
 
 // Use raw middleware only for the Stripe webhook
-app.use('/api/subscription/stripe', express.raw({ type: 'application/json' }), subscriptionWebhook);
+app.use('/api/v1/subscription/stripe', express.raw({ type: 'application/json' }), subscriptionWebhook);
 
 
 // Apply JSON parsing globally for other routes
 app.use(express.json());
-app.use('/api', appRoutes);
+app.use('/api/v1', appRoutes);
 
 initializeSocketIO(server);
 
