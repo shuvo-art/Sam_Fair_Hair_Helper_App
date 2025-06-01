@@ -5,7 +5,8 @@ import { exec, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
-import { uploadImage } from '../../utils/cloudinary';
+import { uploadImage } from '../../utils/s3';
+//import { uploadImage } from '../../utils/cloudinary';
 
 const execPromise = promisify(exec);
 

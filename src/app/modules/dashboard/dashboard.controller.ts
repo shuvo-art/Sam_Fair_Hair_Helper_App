@@ -4,7 +4,8 @@ import { User, IUser } from '../user/user.model';
 import { ChatHistory } from '../chatbot/chatHistory.model';
 import { Subscription } from '../subscription/subscription.model';
 import { Package } from '../subscription/package.model';
-import { uploadImage, uploadHeroImage, getHeroImages, deleteHeroImage } from '../../utils/cloudinary';
+import { uploadImage, uploadHeroImage, getHeroImages, deleteHeroImage } from '../../utils/s3';
+//import { uploadImage, uploadHeroImage, getHeroImages, deleteHeroImage } from '../../utils/cloudinary';
 import fs from 'fs/promises';
 import Stripe from 'stripe';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {

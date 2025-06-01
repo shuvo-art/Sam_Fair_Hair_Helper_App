@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import { getUserProfile, updateUserProfile } from './user.controller';
 import { authenticate } from '../auth/auth.middleware';
 import multer from 'multer';
-import { uploadImage } from '../../utils/cloudinary';
+import { uploadImage } from '../../utils/s3';
+//import { uploadImage } from '../../utils/cloudinary';
 import { User } from './user.model';
 
 const router = express.Router();
