@@ -47,17 +47,11 @@ jobs:
 
       - name: Upgrade pip and install Python dependencies
         run: |
-          cd maxim
+          cd samfair
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Removed Python test step since pytest is not in requirements.txt
-      # - name: Run Python tests
-      #   run: |
-      #     cd maxim
-      #     pytest || echo "No Python tests defined"
-
-  deploy:
+  deploy-ecs:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -66,84 +60,64 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver: docker-container  # Use docker-container driver to support cache export
+          driver: docker-container
 
-      - name: Build and push backend Docker image
+      - name: Build and push Docker image to ECR
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/mexilef-advision-ai:latest
-           # Temporarily disable cache to avoid BlobNotFound error
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
+          tags: ${{ steps.login-ecr.outputs.registry }}/sam-fair-hai-helper-app:latest
           build-args: |
             FIREBASE_SERVICE_ACCOUNT=${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy to GoDaddy VPS
-        uses: appleboy/ssh-action@master
+      - name: Update ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
-          script: |
-            # Accept host key to avoid verification failure
-            mkdir -p /root/.ssh
-            touch /root/.ssh/known_hosts
-            ssh-keyscan -H 72.167.224.36 >> /root/.ssh/known_hosts 2>/dev/null
-            # Ensure Docker service is running
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            # Verify Docker is installed and accessible
-            if ! command -v docker &> /dev/null; then
-              echo "Docker is not installed. Installing Docker..."
-              sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-              sudo dnf install -y docker-ce docker-ce-cli containerd.io
-              sudo systemctl start docker
-              sudo systemctl enable docker
-              sudo usermod -aG docker root
-            fi
-            # Pull the latest image
-            docker pull ${{ secrets.DOCKER_USERNAME }}/mexilef-advision-ai:latest
-            # Stop and remove the existing container (if it exists)
-            docker stop mexilef-advision-ai-backend || true
-            docker rm mexilef-advision-ai-backend || true
-            # Run the new container
-            docker run -d \
-              --name mexilef-advision-ai-backend \
-              -p 5006:5006 \
-              -v /root/uploads:/app/uploads \
-              -v /root/maxim:/app/maxim \
-              -e NODE_ENV=production \
-              -e PORT=5006 \
-              -e MONGO_URI="${{ secrets.MONGO_URI }}" \
-              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-              -e REFRESH_TOKEN_SECRET="${{ secrets.REFRESH_TOKEN_SECRET }}" \
-              -e CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}" \
-              -e CLOUDINARY_API_KEY="${{ secrets.CLOUDINARY_API_KEY }}" \
-              -e CLOUDINARY_API_SECRET="${{ secrets.CLOUDINARY_API_SECRET }}" \
-              -e STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
-              -e STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-              -e EMAIL_USER="${{ secrets.EMAIL_USER }}" \
-              -e EMAIL_PASS="${{ secrets.EMAIL_PASS }}" \
-              -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
-              -e BASE_URL="${{ secrets.BASE_URL }}" \
-              -e ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS }}" \
-              -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-              -e VISION_API_KEY="${{ secrets.VISION_API_KEY }}" \
-              -e FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
-              --restart unless-stopped \
-              ${{ secrets.DOCKER_USERNAME }}/mexilef-advision-ai:latest
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          task-definition: task-definition.json
+          container-name: backend
+          image: ${{ steps.login-ecr.outputs.registry }}/sam-fair-hai-helper-app:latest
+          environment-variables: |
+            NODE_ENV=production
+            PORT=5007
+            MONGO_URI=${{ secrets.MONGO_URI }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            REFRESH_TOKEN_SECRET=${{ secrets.REFRESH_TOKEN_SECRET }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_REGION=eu-north-1
+            AWS_S3_BUCKET=sam-fair-hair-helper-app
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            EMAIL_USER=${{ secrets.EMAIL_USER }}
+            EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            BASE_URL=${{ secrets.BASE_URL }}
+            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}
+            FIREBASE_SERVICE_ACCOUNT=${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: sam-fair-hai-helper-app-service
+          cluster: sam-fair-hai-helper-app-cluster
+          wait-for-service-stability: true
