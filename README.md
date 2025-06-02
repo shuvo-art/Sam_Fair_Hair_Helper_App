@@ -51,8 +51,29 @@ The project is containerized using Docker and deployed via a GitHub Actions CI/C
 Set up environment variables: Create a .env file with the required variables as defined in docker-compose.yml (e.g., MONGO_URI, JWT_SECRET, etc.).
 
 ```bash
+# Build and Run with Docker Compose
 $ docker-compose up --build
-```
+
+# Check running containers
+$ docker ps
+
+# View logs for debugging
+$ docker-compose logs | grep -i error
+
+# Test the application health
+$ curl http://localhost:5007/api/health
+
+# Send a chatbot message (replace <Bearer Token>)
+$ curl -X POST http://localhost:5007/api/v1/chatbot/message -H "Authorization: Bearer <Bearer Token>" -H "Content-Type: application/json" -d '{"userMessage": "What is NDIS?"}'
+
+# Stop the containers
+$ docker-compose down
+
+# Remove the Docker image
+$ docker rmi sam-fair-hai-helper-app:latest
+
+# Clean up unused Docker resources
+$ docker system prune -a
 
 With GoDaddy VPS, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
