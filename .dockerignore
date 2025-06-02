@@ -1,0 +1,57 @@
+# Ignore node_modules (rebuilt in the container)
+node_modules/
+
+# Ignore dist (generated during build)
+dist/
+
+# Ignore virtual environment (created during build)
+venv/
+samfair/venv/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+
+# Ignore uploads directory (mounted as a volume)
+uploads/
+
+# Ignore local environment files
+.env.local
+.env.development
+.env.test
+
+# Ignore Git-related files
+.git/
+.gitignore
+
+# Ignore Firebase Admin SDK key
+src/app/config/somos-ai-voice-cloning-firebase-adminsdk-fbsvc-0793bb60e0.json
+
+
+# Ignore IDE-specific files
+.idea/ 
+.vscode/ 
+*.suo 
+.ntvs*.njsproj 
+*.sln 
+.DS_Store 
+Thumbs.db
+
+# Ignore build and cache files
+build/ 
+.cache/ 
+coverage/ 
+*.tsbuildinfo
+
+# Ignore test artifacts
+tests-output/ 
+*.test.js 
+*.test.ts 
+*.spec.js 
+*.spec.ts
+
+# Ignore specific service-related files
+stripe/ 
+cloudinary/ 
+axios-cache/ 
+socket.io/

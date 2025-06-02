@@ -15,6 +15,11 @@ import { authenticate } from './modules/auth/auth.middleware';
 
 const router = express.Router();
 
+// Health check endpoint (public)
+router.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
 // Public routes
 router.use('/auth', authRoutes);
 
