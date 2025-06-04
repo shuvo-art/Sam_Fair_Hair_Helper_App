@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { IUser } from '../user/user.model';
 
-// Interface for a single budget entry (category, subcategory, amount)
+// Interface for a single budget entry (category, subcategory, amount, usedAmount)
 export interface IBudgetEntry {
   category: string;
   subcategory: string;
   amount: number;
+  usedAmount: number;
 }
 
 // Interface for the budget document
@@ -62,7 +63,8 @@ const BudgetEntrySchema: Schema = new Schema({
       message: (props: any) => `${props.value} is not a valid subcategory for category ${props.instance.category}`
     }
   },
-  amount: { type: Number, required: true, min: 0 }
+  amount: { type: Number, required: true, min: 0 },
+  usedAmount: { type: Number, default: 0, min: 0 }
 });
 
 const BudgetSchema: Schema = new Schema(
