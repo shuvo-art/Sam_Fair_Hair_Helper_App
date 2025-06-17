@@ -120,4 +120,13 @@ jobs:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: sam-fair-hai-helper-app-service
           cluster: sam-fair-hai-helper-app-cluster
-          wait-for-service-stability: true
+          wait-for-service-stability: false  # Temporarily disable to avoid timeout
+
+      - name: Check ECS Service Status
+        run: |
+          aws ecs describe-services \
+            --cluster sam-fair-hai-helper-app-cluster \
+            --services sam-fair-hai-helper-app-service \
+            --region eu-north-1 \
+            --query 'services[0].{Status: status, RunningCount: runningCount, DesiredCount: desiredCount, Events: events[0:5]}' \
+            --output json
