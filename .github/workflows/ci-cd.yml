@@ -49,7 +49,7 @@ jobs:
         run: |
           cd samfair
           python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --no-cache-dir -r requirements.txt
 
   deploy-ecs:
     needs: build-and-test
