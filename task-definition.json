@@ -1,0 +1,67 @@
+{
+    "family": "sam-fair-hai-helper-app",
+    "networkMode": "awsvpc",
+    "containerDefinitions": [
+        {
+            "name": "backend",
+            "image": "648879868665.dkr.ecr.eu-north-1.amazonaws.com/sam-fair-hai-helper-app:latest",
+            "essential": true,
+            "portMappings": [
+                {
+                    "containerPort": 5007,
+                    "hostPort": 5007,
+                    "protocol": "tcp"
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "Uploads",
+                    "containerPath": "/app/uploads",
+                    "readOnly": false
+                },
+                {
+                    "sourceVolume": "samfair",
+                    "containerPath": "/app/samfair",
+                    "readOnly": false
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/sam-fair-hai-helper-app",
+                    "awslogs-region": "eu-north-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            }
+        }
+    ],
+    "volumes": [
+        {
+            "name": "Uploads",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "fs-0ef6e5f9ff0a7cf28",
+                "transitEncryption": "ENABLED",
+                "authorizationConfig": {
+                    "accessPointId": "fsap-06ca7f0b212a79da9",
+                    "iam": "ENABLED"
+                }
+            }
+        },
+        {
+            "name": "samfair",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "fs-0ef6e5f9ff0a7cf28",
+                "transitEncryption": "ENABLED",
+                "authorizationConfig": {
+                    "accessPointId": "fsap-0744cd5111d75bbd0",
+                    "iam": "ENABLED"
+                }
+            }
+        }
+    ],
+    "requiresCompatibilities": ["FARGATE"],
+    "cpu": "256",
+    "memory": "512",
+    "executionRoleArn": "arn:aws:iam::648879868665:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::648879868665:role/ecsTaskExecutionRole"
+}
