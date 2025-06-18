@@ -38,7 +38,7 @@
                 "interval": 30,
                 "timeout": 5,
                 "retries": 3,
-                "startPeriod": 60
+                "startPeriod": 90
             }
         }
     ],
@@ -70,5 +70,12 @@
     "cpu": "512",
     "memory": "1024",
     "executionRoleArn": "arn:aws:iam::648879868665:role/ecsTaskExecutionRole",
-    "taskRoleArn": "arn:aws:iam::648879868665:role/ecsTaskExecutionRole"
+    "taskRoleArn": "arn:aws:iam::648879868665:role/ecsTaskExecutionRole",
+    "networkConfiguration": {
+        "awsvpcConfiguration": {
+            "subnets": ["subnet-0ad10b69dd6325b5e", "subnet-0613fabe5d9fb6c8f"],
+            "securityGroups": ["sg-084b860a6f3193c6b"],
+            "assignPublicIp": "ENABLED"
+        }
+    }
 }

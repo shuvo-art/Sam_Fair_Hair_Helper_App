@@ -130,3 +130,25 @@ jobs:
             --region eu-north-1 \
             --query 'services[0].{Status: status, RunningCount: runningCount, DesiredCount: desiredCount, Events: events[0:5]}' \
             --output json
+
+      - name: Debug Task Logs
+        run: |
+          aws ecs list-tasks \
+            --cluster sam-fair-hai-helper-app-cluster \
+            --service-name sam-fair-hai-helper-app-service \
+            --region eu-north-1 \
+            --output json
+          aws logs tail /ecs/sam-fair-hai-helper-app --region eu-north-1 --since 1h
+
+      - name: Verify ALB Configuration
+        run: |
+          aws elbv2 describe-load-balancers \
+            --names sam-fair-alb-745789863 \
+            --region eu-north-1 \
+            --query 'LoadBalancers[0].{DNSName: DNSName, State: State}' \
+            --output json
+          aws elbv2 describe-target-groups \
+            --names sam-fair-tg/9618c543db03ed5f \
+            --region eu-north-1 \
+            --query 'TargetGroups[0].{HealthCheckPath: HealthCheckPath, Port: Port, TargetGroupArn: TargetGroupArn}' \
+            --output json
