@@ -143,12 +143,13 @@ jobs:
       - name: Verify ALB Configuration
         run: |
           aws elbv2 describe-load-balancers \
-            --names sam-fair-alb-745789863 \
+            --names sam-fair-alb \
             --region eu-north-1 \
             --query 'LoadBalancers[0].{DNSName: DNSName, State: State}' \
             --output json
+          
           aws elbv2 describe-target-groups \
-            --names sam-fair-tg/9618c543db03ed5f \
+            --names sam-fair-tg \
             --region eu-north-1 \
             --query 'TargetGroups[0].{HealthCheckPath: HealthCheckPath, Port: Port, TargetGroupArn: TargetGroupArn}' \
             --output json
