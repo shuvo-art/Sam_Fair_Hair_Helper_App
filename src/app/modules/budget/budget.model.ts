@@ -56,11 +56,16 @@ const BudgetEntrySchema: Schema = new Schema({
     type: String, 
     required: true,
     validate: {
-      validator: function(this: any, value: string) {
-        // Ensure subcategory belongs to the selected category
-        return categorySubcategoryMap[this.category]?.includes(value);
+      validator: function(this: any, value: string): boolean {
+        // Safely get category from the current document instance
+        const category = this.category;
+        return category && categorySubcategoryMap[category]?.includes(value) || false;
       },
-      message: (props: any) => `${props.value} is not a valid subcategory for category ${props.instance.category}`
+      message: function(this: any, props: any): string {
+        // Safely get category from the current document instance
+        const category = this.category || 'unknown';
+        return `${props.value} is not a valid subcategory for category ${category}`;
+      }
     }
   },
   amount: { type: Number, required: true, min: 0 },

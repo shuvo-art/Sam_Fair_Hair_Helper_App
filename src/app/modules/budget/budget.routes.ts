@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const router = express.Router();
 
-// Validation schema for a single budget entry
+// Validation schemas remain unchanged (as provided earlier)
 const budgetEntrySchema = z.object({
   category: z.enum(['Core Supports', 'Capacity Building Supports', 'Capital Supports']),
   subcategory: z.enum([
@@ -31,21 +31,18 @@ const budgetEntrySchema = z.object({
   amount: z.number().min(0)
 });
 
-// Validation schema for creating a budget
 const createBudgetSchema = z.object({
   entries: z.array(budgetEntrySchema).min(1, 'At least one budget entry is required'),
   startDate: z.string().transform((val) => new Date(val)),
   endDate: z.string().transform((val) => new Date(val)),
 });
 
-// Validation schema for updating a budget
 const updateBudgetSchema = z.object({
   entries: z.array(budgetEntrySchema).optional(),
   startDate: z.string().transform((val) => new Date(val)).optional(),
   endDate: z.string().transform((val) => new Date(val)).optional(),
 });
 
-// Validation schema for recording used budget amounts
 const useBudgetSchema = z.object({
   entries: z.array(
     z.object({
@@ -75,6 +72,23 @@ const useBudgetSchema = z.object({
   ).min(1, 'At least one entry is required')
 });
 
+// Helper function to calculate period elapsed percentage
+const calculatePeriodElapsed = (startDate: Date, endDate: Date, currentDate: Date = new Date()) => {
+  const totalDurationMs = endDate.getTime() - startDate.getTime();
+  const elapsedMs = currentDate.getTime() - startDate.getTime();
+  return totalDurationMs > 0 ? Math.min(100, Math.max(0, (elapsedMs / totalDurationMs) * 100)) : 0;
+};
+
+// Helper function to calculate weeks or months in duration
+const getDurationUnits = (startDate: Date, endDate: Date, unit: 'weeks' | 'months') => {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const msPerWeek = msPerDay * 7;
+  const msPerMonth = msPerDay * 30.436875; // Average days per month
+
+  const totalDurationMs = endDate.getTime() - startDate.getTime();
+  return Math.ceil(unit === 'weeks' ? totalDurationMs / msPerWeek : totalDurationMs / msPerMonth);
+};
+
 // Create budget with multiple entries
 router.post('/', authenticate, async (req: Request, res: Response) => {
   try {
@@ -87,7 +101,6 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     const parsedData = createBudgetSchema.parse(req.body);
     const { entries, startDate, endDate } = parsedData;
 
-    // Check if a budget already exists for this user within the date range
     const budget = await Budget.findOne({
       userId,
       startDate: { $lte: endDate },
@@ -95,17 +108,15 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     });
 
     if (budget) {
-      // Update existing budget by merging entries
       entries.forEach((newEntry: any) => {
         const existingEntryIndex = budget.entries.findIndex(
           (entry: any) => entry.category === newEntry.category && entry.subcategory === newEntry.subcategory
         );
         if (existingEntryIndex !== -1) {
-          // Update existing entry
           budget.entries[existingEntryIndex].amount = newEntry.amount;
         } else {
-          // Add new entry
-          budget.entries.push(newEntry);
+          // Ensure newEntry is a plain object before pushing
+          budget.entries.push({ ...newEntry });
         }
       });
       budget.startDate = startDate;
@@ -113,10 +124,9 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
       await budget.save();
       res.status(201).json({ success: true, budget });
     } else {
-      // Create new budget
       const newBudget = new Budget({
         userId,
-        entries,
+        entries: entries.map(entry => ({ ...entry })), // Ensure entries are plain objects
         startDate,
         endDate,
       });
@@ -127,7 +137,6 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     res.status(400).json({ success: false, message: error.message });
   }
 });
-
 // Update specific budget
 router.put('/:id', authenticate, async (req: Request, res: Response) => {
   try {
@@ -147,21 +156,17 @@ router.put('/:id', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Update startDate and endDate if provided
     if (parsedData.startDate) budget.startDate = parsedData.startDate;
     if (parsedData.endDate) budget.endDate = parsedData.endDate;
 
-    // Merge entries if provided
     if (parsedData.entries) {
       parsedData.entries.forEach((newEntry: any) => {
         const existingEntryIndex = budget.entries.findIndex(
           (entry: any) => entry.category === newEntry.category && entry.subcategory === newEntry.subcategory
         );
         if (existingEntryIndex !== -1) {
-          // Update existing entry
           budget.entries[existingEntryIndex].amount = newEntry.amount;
         } else {
-          // Add new entry
           budget.entries.push(newEntry);
         }
       });
@@ -193,15 +198,13 @@ router.post('/:id/use', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Update usedAmount for specified entries
     parsedData.entries.forEach((newEntry: any) => {
       const existingEntryIndex = budget.entries.findIndex(
         (entry: any) => entry.category === newEntry.category && entry.subcategory === newEntry.subcategory
       );
       if (existingEntryIndex !== -1) {
-        // Update usedAmount, ensuring it does not exceed the allocated amount
         const entry = budget.entries[existingEntryIndex];
-        const newUsedAmount = entry.usedAmount + newEntry.usedAmount;
+        const newUsedAmount = (entry.usedAmount || 0) + newEntry.usedAmount;
         if (newUsedAmount > entry.amount) {
           throw new Error(`Used amount for ${newEntry.subcategory} exceeds allocated amount of ${entry.amount}`);
         }
@@ -213,9 +216,8 @@ router.post('/:id/use', authenticate, async (req: Request, res: Response) => {
 
     await budget.save();
 
-    // Calculate totals
     const totalAvailable = budget.entries.reduce((sum, entry) => sum + entry.amount, 0);
-    const totalUsed = budget.entries.reduce((sum, entry) => sum + entry.usedAmount, 0);
+    const totalUsed = budget.entries.reduce((sum, entry) => sum + (entry.usedAmount || 0), 0);
     const remainingAmount = totalAvailable - totalUsed;
 
     res.status(200).json({
@@ -258,46 +260,58 @@ router.get('/overview', authenticate, async (req: Request, res: Response) => {
     }
 
     const budgets = await Budget.find({ userId });
+    const currentDate = new Date(); // Current date for period elapsed calculation
 
-    // Group budgets by category
+    // Group budgets by category and calculate totals
     const categories = ['Core Supports', 'Capacity Building Supports', 'Capital Supports'];
     const overview = categories.reduce((acc, category) => {
       acc[category] = {
         total: 0,
         totalUsed: 0,
         remaining: 0,
+        percentage: 0,
         subcategories: {},
       };
       return acc;
-    }, {} as Record<string, { total: number; totalUsed: number; remaining: number; subcategories: Record<string, { amount: number; usedAmount: number; percentage: number; remaining: number }> }>);
+    }, {} as Record<string, { total: number; totalUsed: number; remaining: number; percentage: number; subcategories: Record<string, { amount: number; usedAmount: number; percentage: number; remaining: number }> }>);
 
-    // Calculate totals, used amounts, and percentages
     budgets.forEach((budget) => {
+      const periodElapsed = calculatePeriodElapsed(budget.startDate, budget.endDate, currentDate);
+      const viewType = req.query.view as 'Weekly' | 'Monthly' | 'Total Budge' | undefined || 'Total Budge';
+      const durationUnits = getDurationUnits(budget.startDate, budget.endDate, viewType === 'Weekly' ? 'weeks' : 'months');
+
       budget.entries.forEach((entry: any) => {
         const category = entry.category;
         const subcategory = entry.subcategory;
-        const amount = entry.amount;
-        const usedAmount = entry.usedAmount;
+        let amount = entry.amount;
+        let usedAmount = entry.usedAmount || 0;
+
+        // Adjust values based on view type
+        if (viewType === 'Weekly' || viewType === 'Monthly') {
+          amount = amount / durationUnits;
+          usedAmount = usedAmount / durationUnits;
+        }
 
         overview[category].total += amount;
         overview[category].totalUsed += usedAmount;
         overview[category].subcategories[subcategory] = {
           amount,
           usedAmount,
-          percentage: 0, // Will calculate later
+          percentage: amount > 0 ? (usedAmount / amount) * 100 : 0,
           remaining: amount - usedAmount
         };
       });
     });
 
-    // Calculate percentages and remaining amounts within each category
+    // Calculate category-level percentages and remaining
     Object.keys(overview).forEach((category) => {
       const total = overview[category].total;
       overview[category].remaining = total - overview[category].totalUsed;
+      overview[category].percentage = total > 0 ? (overview[category].totalUsed / total) * 100 : 0; // Add category percentage
       if (total > 0) {
         Object.keys(overview[category].subcategories).forEach((subcategory) => {
-          const amount = overview[category].subcategories[subcategory].amount;
-          overview[category].subcategories[subcategory].percentage = (amount / total) * 100;
+          const sub = overview[category].subcategories[subcategory];
+          sub.percentage = (sub.usedAmount / sub.amount) * 100 || 0;
         });
       }
     });
@@ -307,14 +321,23 @@ router.get('/overview', authenticate, async (req: Request, res: Response) => {
     const totalUsed = Object.values(overview).reduce((sum, cat) => sum + cat.totalUsed, 0);
     const remainingAmount = totalAvailable - totalUsed;
 
+    // Calculate overall percentage
+    const overallPercentage = totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0;
+
+    // Calculate period elapsed for the first budget (assuming one active budget)
+    const periodElapsed = budgets.length > 0 ? calculatePeriodElapsed(budgets[0].startDate, budgets[0].endDate) : 0;
+
     res.status(200).json({
       success: true,
       overview,
       summary: {
         totalAvailable,
         totalUsed,
-        remainingAmount
-      }
+        remainingAmount,
+        percentage: overallPercentage, // Add overall percentage
+        periodElapsed
+      },
+      viewType: req.query.view
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

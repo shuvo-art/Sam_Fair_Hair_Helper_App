@@ -34,12 +34,22 @@
                 }
             },
             "healthCheck": {
-                "command": ["CMD-SHELL", "curl -f http://localhost:5007/api/v1/health || exit 1"],
+                "command": ["CMD-SHELL", "curl -f http://localhost:5007/health || exit 1"],
                 "interval": 30,
                 "timeout": 5,
                 "retries": 3,
-                "startPeriod": 90
-            }
+                "startPeriod": 60
+            },
+            "environment": [
+                {
+                    "name": "MONGO_URI",
+                    "value": "mongodb://samfairapp:YourStrongAppPassword123%40@10.0.3.51:27017/samfair?authSource=samfair"
+                },
+                {
+                    "name": "PORT",
+                    "value": "5007"
+                }
+            ]
         }
     ],
     "volumes": [

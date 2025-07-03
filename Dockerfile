@@ -34,7 +34,6 @@ RUN apt-get update && apt-get install -y python3-pip python3-venv nano && \
 # Copy the entire application
 COPY . .
 
-
 # Build TypeScript code
 RUN npm run build
 
@@ -63,7 +62,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/samfair ./samfair
 RUN chown -R 999:999 /app/samfair && chmod -R 775 /app/samfair
 
-# Set environment variables for Python 
+# Set environment variables for Python
 ENV PATH="/app/venv/bin:$PATH"
 
 # Install only production Node.js dependencies
@@ -75,6 +74,10 @@ USER appuser
 
 # Expose the application port
 EXPOSE 5007
+
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:5007/health || exit 1
 
 # Start the application
 CMD ["node", "dist/index.js"]
